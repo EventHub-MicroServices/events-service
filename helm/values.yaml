@@ -1,0 +1,40 @@
+replicaCount: 3
+nameSpace: team3-ns
+
+image:
+  repository: team3kubectl/events-service
+  tag: v1.1.0
+  pullPolicy: Always
+
+deployment:
+  strategy:
+    type: RollingUpdate
+    maxSurge: 1
+    maxUnavailable: 1
+
+service:
+  type: ClusterIP
+  port: 8002
+  targetPort: 8002
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "300m"
+    memory: "256Mi"
+
+mongodb:
+  host: events-mongodb
+  port: 27017
+  database: events_db
+  uri: "mongodb://events-mongodb:27017/?maxPoolSize=10"
+  username: admin
+  password: adminpass
+
+probes:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 30

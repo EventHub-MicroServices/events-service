@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: events-config
+  namespace: team3-ns
+data:
+  PORT: "8002"
+  MONGO_HOST:  events-mongodb
+  MONGO_PORT:  "27017"
+  MONGO_DB:  events_db
+  MONGO_URI: "mongodb://events-mongodb:27017/?maxPoolSize=10"
