@@ -1,0 +1,447 @@
+name: Slack Notify
+description: "Sends Slack notifications for pipeline status"
+
+
+inputs:
+  status:
+    required: true
+  pipeline:
+    required: true
+  job_name:
+    required: true
+  error_message:
+    required: false
+    default: 'Check the GitHub Actions run for details.'
+  # SonarQube specific
+  sonar_bugs:
+    required: false
+    default: 'N/A'
+  sonar_vulnerabilities:
+    required: false
+    default: 'N/A'
+  sonar_code_smells:
+    required: false
+    default: 'N/A'
+  sonar_coverage:
+    required: false
+    default: 'N/A'
+  sonar_gate_status:
+    required: false
+    default: 'FAILED'
+  sonar_project_key:
+    required: false
+    default: 'EventHub-MicroServices_ai-service'
+  # Snyk specific
+  snyk_critical:
+    required: false
+    default: 'N/A'
+  snyk_high:
+    required: false
+    default: 'N/A'
+  snyk_medium:
+    required: false
+    default: 'N/A'
+  # Trivy specific
+  trivy_critical:
+    required: false
+    default: 'N/A'
+  trivy_high:
+    required: false
+    default: 'N/A'
+  # Docker specific
+  docker_image:
+    required: false
+    default: 'N/A'
+  docker_tag:
+    required: false
+    default: 'latest'
+  slack_webhook_url:
+    required: true
+    description: "Slack webhook URL"
+
+
+runs:
+  using: "composite"
+  steps:
+  # ─── SONARQUBE FAILURE ───────────────────────────────────────────────────
+  - name: Slack — SonarQube Failure
+    if: inputs.job_name == 'sonarqube' && inputs.status == 'failed'
+    uses: slackapi/slack-github-action@v1.27.0
+    with:
+      payload: |
+        {
+          "text": "❌ PIPELINE FAILED — Code Quality Gate",
+          "blocks": [
+            {
+              "type": "header",
+              "text": { "type": "plain_text", "text": "❌ PIPELINE FAILED — Code Quality Gate" }
+            },
+            {
+              "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*📋 Repository:*\n${{ github.repository }}" },
+                { "type": "mrkdwn", "text": "*🌿 Branch:*\n${{ github.ref_name }}" },
+                { "type": "mrkdwn", "text": "*👤 Triggered by:*\n${{ github.actor }}" },
+                { "type": "mrkdwn", "text": "*🔍 Failed Job:*\nSonarQube Scan" }
+              ]
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*📊 SonarQube Report:*\n• Bugs: `${{ inputs.sonar_bugs }}`\n• Vulnerabilities: `${{ inputs.sonar_vulnerabilities }}`\n• Code Smells: `${{ inputs.sonar_code_smells }}`\n• Coverage: `${{ inputs.sonar_coverage }}%`\n• Quality Gate: ❌ `${{ inputs.sonar_gate_status }}`"
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔗 View GitHub Run" },
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                },
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "📊 SonarCloud Dashboard" },
+                  "url": "https://sonarcloud.io/dashboard?id=${{ inputs.sonar_project_key }}"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                { "type": "mrkdwn", "text": "⏰ ${{ github.event.head_commit.timestamp }}" }
+              ]
+            }
+          ]
+        }
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ─── SNYK FAILURE ────────────────────────────────────────────────────────
+  - name: Slack — Snyk Failure
+    if: inputs.job_name == 'snyk-sca' && inputs.status == 'failed'
+    uses: slackapi/slack-github-action@v1.27.0
+    with:
+      payload: |
+        {
+          "text": "❌ PIPELINE FAILED — Vulnerability Scan",
+          "blocks": [
+            {
+              "type": "header",
+              "text": { "type": "plain_text", "text": "❌ PIPELINE FAILED — Vulnerability Scan" }
+            },
+            {
+              "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*📋 Repository:*\n${{ github.repository }}" },
+                { "type": "mrkdwn", "text": "*🌿 Branch:*\n${{ github.ref_name }}" },
+                { "type": "mrkdwn", "text": "*👤 Triggered by:*\n${{ github.actor }}" },
+                { "type": "mrkdwn", "text": "*🔍 Failed Job:*\nSnyk SCA Scan" }
+              ]
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*🛡️ Snyk Report:*\n• 🔴 Critical CVEs: `${{ inputs.snyk_critical }}`\n• 🟠 High CVEs: `${{ inputs.snyk_high }}`\n• 🟡 Medium CVEs: `${{ inputs.snyk_medium }}`"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*💬 Error:*\n```${{ inputs.error_message }}```"
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔗 View GitHub Run" },
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                },
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🛡️ Snyk Dashboard" },
+                  "url": "https://app.snyk.io"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                { "type": "mrkdwn", "text": "⏰ ${{ github.event.head_commit.timestamp }}" }
+              ]
+            }
+          ]
+        }
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ─── DOCKER BUILD FAILURE ────────────────────────────────────────────────
+  - name: Slack — Docker Build Failure
+    if: inputs.job_name == 'docker-build' && inputs.status == 'failed'
+    uses: slackapi/slack-github-action@v1.27.0
+    with:
+      payload: |
+        {
+          "text": "❌ PIPELINE FAILED — Docker Build",
+          "blocks": [
+            {
+              "type": "header",
+              "text": { "type": "plain_text", "text": "❌ PIPELINE FAILED — Docker Build" }
+            },
+            {
+              "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*📋 Repository:*\n${{ github.repository }}" },
+                { "type": "mrkdwn", "text": "*🌿 Branch:*\n${{ github.ref_name }}" },
+                { "type": "mrkdwn", "text": "*👤 Triggered by:*\n${{ github.actor }}" },
+                { "type": "mrkdwn", "text": "*🔍 Failed Job:*\nDocker Build" }
+              ]
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*🐳 Docker Details:*\n• Image: `${{ inputs.docker_image }}:${{ inputs.docker_tag }}`\n• Dockerfile: `./Dockerfile`"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*💬 Error:*\n```${{ inputs.error_message }}```"
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔗 View GitHub Run" },
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                { "type": "mrkdwn", "text": "⏰ ${{ github.event.head_commit.timestamp }}" }
+              ]
+            }
+          ]
+        }
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ─── TRIVY SCAN FAILURE ──────────────────────────────────────────────────
+  - name: Slack — Trivy Scan Failure
+    if: inputs.job_name == 'trivy-scan' && inputs.status == 'failed'
+    uses: slackapi/slack-github-action@v1.27.0
+    with:
+      payload: |
+        {
+          "text": "❌ PIPELINE FAILED — Docker Image Scan",
+          "blocks": [
+            {
+              "type": "header",
+              "text": { "type": "plain_text", "text": "❌ PIPELINE FAILED — Docker Image Scan" }
+            },
+            {
+              "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*📋 Repository:*\n${{ github.repository }}" },
+                { "type": "mrkdwn", "text": "*🌿 Branch:*\n${{ github.ref_name }}" },
+                { "type": "mrkdwn", "text": "*👤 Triggered by:*\n${{ github.actor }}" },
+                { "type": "mrkdwn", "text": "*🔍 Failed Job:*\nTrivy Image Scan" }
+              ]
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*🔬 Trivy Scan Report:*\n• Image: `${{ inputs.docker_image }}:${{ inputs.docker_tag }}`\n• 🔴 Critical CVEs: `${{ inputs.trivy_critical }}`\n• 🟠 High CVEs: `${{ inputs.trivy_high }}`\n\n⚠️ *Image was NOT pushed to Docker Hub*"
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔗 View GitHub Run" },
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                },
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔬 Security Tab" },
+                  "url": "https://github.com/${{ github.repository }}/security/code-scanning"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                { "type": "mrkdwn", "text": "⏰ ${{ github.event.head_commit.timestamp }}" }
+              ]
+            }
+          ]
+        }
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ─── DOCKER PUSH FAILURE ─────────────────────────────────────────────────
+  - name: Slack — Docker Push Failure
+    if: inputs.job_name == 'docker-push' && inputs.status == 'failed'
+    uses: slackapi/slack-github-action@v1.27.0
+    with:
+      payload: |
+        {
+          "text": "❌ PIPELINE FAILED — Docker Push",
+          "blocks": [
+            {
+              "type": "header",
+              "text": { "type": "plain_text", "text": "❌ PIPELINE FAILED — Docker Push" }
+            },
+            {
+              "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*📋 Repository:*\n${{ github.repository }}" },
+                { "type": "mrkdwn", "text": "*🌿 Branch:*\n${{ github.ref_name }}" },
+                { "type": "mrkdwn", "text": "*👤 Triggered by:*\n${{ github.actor }}" },
+                { "type": "mrkdwn", "text": "*🔍 Failed Job:*\nDocker Push to Hub" }
+              ]
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*🐳 Docker Details:*\n• Image: `${{ inputs.docker_image }}:${{ inputs.docker_tag }}`\n• Target: Docker Hub\n\n*💬 Error:*\n```${{ inputs.error_message }}```\n\n💡 Check `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets."
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔗 View GitHub Run" },
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                { "type": "mrkdwn", "text": "⏰ ${{ github.event.head_commit.timestamp }}" }
+              ]
+            }
+          ]
+        }
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ─── FULL PIPELINE SUCCESS ───────────────────────────────────────────────
+  - name: Slack — Full Pipeline Success
+    if: inputs.status == 'success'
+    uses: slackapi/slack-github-action@v1.27.0
+    with:
+      payload: |
+        {
+          "text": "✅ PIPELINE SUCCEEDED",
+          "blocks": [
+            {
+              "type": "header",
+              "text": { "type": "plain_text", "text": "✅ PIPELINE SUCCEEDED" }
+            },
+            {
+              "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*📋 Repository:*\n${{ github.repository }}" },
+                { "type": "mrkdwn", "text": "*🌿 Branch:*\n${{ github.ref_name }}" },
+                { "type": "mrkdwn", "text": "*👤 Triggered by:*\n${{ github.actor }}" },
+                { "type": "mrkdwn", "text": "*🐳 Image:*\n`${{ inputs.docker_image }}:${{ inputs.docker_tag }}`" }
+              ]
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*📊 Summary:*\n✅ SonarQube — Quality Gate Passed\n✅ Snyk — No Critical Vulnerabilities\n✅ Docker Build — Success\n✅ Trivy Scan — No Critical CVEs\n✅ Docker Push — Image Published"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "```docker pull ${{ inputs.docker_image }}:${{ inputs.docker_tag }}```"
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔗 View GitHub Run" },
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                },
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🐳 Docker Hub" },
+                  "url": "https://hub.docker.com/r/${{ inputs.docker_image }}"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                { "type": "mrkdwn", "text": "⏰ ${{ github.event.head_commit.timestamp }}" }
+              ]
+            }
+          ]
+        }
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
