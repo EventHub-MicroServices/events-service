@@ -377,9 +377,78 @@ runs:
       SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
       SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
+  # ─── CI SCAN SUCCESS (Sonar + Snyk) ──────────────────────────────────────
+  - name: Slack — CI Scan Success
+    if: inputs.job_name == 'quality-&-security-scans' && inputs.status == 'success'
+    uses: slackapi/slack-github-action@v1.27.0
+    with:
+      payload: |
+        {
+          "text": "✅ CI SCAN PASSED — Quality & Security",
+          "blocks": [
+            {
+              "type": "header",
+              "text": { "type": "plain_text", "text": "✅ CI SCAN PASSED — Quality & Security" }
+            },
+            {
+              "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*📋 Repository:*\n${{ github.repository }}" },
+                { "type": "mrkdwn", "text": "*🌿 Branch:*\n${{ github.ref_name }}" },
+                { "type": "mrkdwn", "text": "*👤 Triggered by:*\n${{ github.actor }}" },
+                { "type": "mrkdwn", "text": "*🏁 Status:*\nAll Scans Green" }
+              ]
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*📊 SonarQube Summary:*\n• Bugs: `${{ inputs.sonar_bugs }}`\n• Vulnerabilities: `${{ inputs.sonar_vulnerabilities }}`\n• Code Smells: `${{ inputs.sonar_code_smells }}`\n• Coverage: `${{ inputs.sonar_coverage }}%`"
+              }
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*🛡️ Snyk Security Summary:*\n• Critical CVEs: `${{ inputs.snyk_critical }}`\n• High CVEs: `${{ inputs.snyk_high }}`\n• Medium CVEs: `${{ inputs.snyk_medium }}`"
+              }
+            },
+            {
+              "type": "divider"
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "🔗 View GitHub Run" },
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                },
+                {
+                  "type": "button",
+                  "text": { "type": "plain_text", "text": "📊 SonarCloud" },
+                  "url": "https://sonarcloud.io/dashboard?id=${{ inputs.sonar_project_key }}"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                { "type": "mrkdwn", "text": "⏰ ${{ github.event.head_commit.timestamp }}" }
+              ]
+            }
+          ]
+        }
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
   # ─── FULL PIPELINE SUCCESS ───────────────────────────────────────────────
   - name: Slack — Full Pipeline Success
-    if: inputs.status == 'success'
+    if: inputs.status == 'success' && inputs.job_name != 'quality-&-security-scans'
     uses: slackapi/slack-github-action@v1.27.0
     with:
       payload: |
