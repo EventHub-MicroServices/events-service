@@ -98,11 +98,11 @@ jobs:
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2: Snyk SCA Scan (runs in parallel with SonarQube)
+  # JOB 2: Snyk SCA Scan (runs after SonarQube)
   # ─────────────────────────────────────────────────────────────────────────────
   snyk-sca:
     name: Snyk
+    needs: [sonarqube]
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -164,12 +164,28 @@ jobs:
           error_message: ${{ steps.snyk-counts.outputs.error_msg }}
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 3: Call Docker Pipeline Workflow
+  # JOB 3: Unified Success Notification
   # ─────────────────────────────────────────────────────────────────────────────
-  trigger-docker-pipeline:
-    name: Docker
+  notify-success:
+    name: Notify Success
     needs: [sonarqube, snyk-sca]
-    if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/docker.yaml
-    secrets: inherit
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Slack Success Notification
+        uses: ./.github/actions/slack-notify
+        with:
+          status: "success"
+          pipeline: "CI"
+          job_name: "quality-&-security-scans"
+          sonar_bugs: ${{ needs.sonarqube.outputs.bugs }}
+          sonar_vulnerabilities: ${{ needs.sonarqube.outputs.vulnerabilities }}
+          sonar_code_smells: ${{ needs.sonarqube.outputs.code_smells }}
+          sonar_coverage: ${{ needs.sonarqube.outputs.coverage }}
+          sonar_gate_status: ${{ needs.sonarqube.outputs.quality_gate }}
+          snyk_critical: ${{ needs.snyk-sca.outputs.critical }}
+          snyk_high: ${{ needs.snyk-sca.outputs.high }}
+          snyk_medium: ${{ needs.snyk-sca.outputs.medium }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
