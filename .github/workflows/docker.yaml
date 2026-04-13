@@ -18,7 +18,7 @@ env:
 jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 1: Verified Docker Pipeline
+  # Unified Docker Pipeline (Build → Trivy Scan → Push)
   # ─────────────────────────────────────────────────────────────────────────────
   docker-pipeline:
     name: Docker Pipeline
@@ -40,8 +40,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-
-      # 🐳 [1] BUILD STAGE ===========================================
+      # 🐳 [1] BUILD ────────────────────────────────────────────────────────────
       - name: Build Docker image
         id: build
         run: |
@@ -57,20 +56,23 @@ jobs:
           ERROR=$(tail -20 build.log | tr '\n' ' ')
           echo "error_msg=$ERROR" >> $GITHUB_OUTPUT
 
-      - name: Slack Build Failure
+      - name: Notify — Docker build failure
         if: failure() && steps.build.outcome == 'failure'
         uses: ./.github/actions/slack-notify
         with:
-          status: "failed"
-          pipeline: "Docker"
-          job_name: "docker-build"
-          docker_image: ${{ env.IMAGE_NAME }}
-          docker_tag: ${{ env.IMAGE_TAG }}
-          error_message: ${{ steps.capture-build-error.outputs.error_msg }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status:             "failed"
+          pipeline:           "Docker"
+          job_name:           "docker-build"
+          docker_image:       ${{ env.IMAGE_NAME }}
+          docker_tag:         ${{ env.IMAGE_TAG }}
+          error_message:      ${{ steps.capture-build-error.outputs.error_msg }}
+          slack_webhook_url:  ${{ secrets.SLACK_WEBHOOK_URL }}
+          gmail_username:     ${{ secrets.GMAIL_USERNAME }}
+          gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          notify_email_to:    ${{ secrets.NOTIFY_EMAIL_TO }}
 
 
-      # 🛡️ [2] TRIVY SCAN STAGE ======================================
+      # 🛡️ [2] TRIVY SCAN ────────────────────────────────────────────────────────
       - name: Trivy scan — table output (logs)
         uses: aquasecurity/trivy-action@v0.24.0
         with:
@@ -114,23 +116,25 @@ jobs:
           severity: CRITICAL
           exit-code: 1
 
-      - name: Slack Trivy Failure
+      - name: Notify — Trivy scan failure
         if: failure() && steps.trivy-critical.outcome == 'failure'
         uses: ./.github/actions/slack-notify
         with:
-          status: "failed"
-          pipeline: "Docker"
-          job_name: "trivy-scan"
-          docker_image: ${{ env.IMAGE_NAME }}
-          docker_tag: ${{ env.IMAGE_TAG }}
-          trivy_critical: ${{ steps.trivy-counts.outputs.critical }}
-          trivy_high: ${{ steps.trivy-counts.outputs.high }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status:             "failed"
+          pipeline:           "Docker"
+          job_name:           "trivy-scan"
+          docker_image:       ${{ env.IMAGE_NAME }}
+          docker_tag:         ${{ env.IMAGE_TAG }}
+          trivy_critical:     ${{ steps.trivy-counts.outputs.critical }}
+          trivy_high:         ${{ steps.trivy-counts.outputs.high }}
+          slack_webhook_url:  ${{ secrets.SLACK_WEBHOOK_URL }}
+          gmail_username:     ${{ secrets.GMAIL_USERNAME }}
+          gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          notify_email_to:    ${{ secrets.NOTIFY_EMAIL_TO }}
 
 
-      # 🚀 [3] SECURE PUSH STAGE =====================================
+      # 🚀 [3] PUSH ─────────────────────────────────────────────────────────────
       - name: Login to Docker Hub
-        # if steps didn't fail earlier, we are cleared to login and push
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -141,7 +145,7 @@ jobs:
         run: |
           set -o pipefail
           docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} 2>&1 | tee push.log
-          
+
       - name: Capture push error
         id: capture-push-error
         if: failure() && steps.push.outcome == 'failure'
@@ -149,27 +153,33 @@ jobs:
           ERROR=$(tail -10 push.log | tr '\n' ' ')
           echo "error_msg=$ERROR" >> $GITHUB_OUTPUT
 
-      - name: Slack Push Failure
+      - name: Notify — Docker push failure
         if: failure() && steps.push.outcome == 'failure'
         uses: ./.github/actions/slack-notify
         with:
-          status: "failed"
-          pipeline: "Docker"
-          job_name: "docker-push"
-          docker_image: ${{ env.IMAGE_NAME }}
-          docker_tag: ${{ env.IMAGE_TAG }}
-          error_message: ${{ steps.capture-push-error.outputs.error_msg }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status:             "failed"
+          pipeline:           "Docker"
+          job_name:           "docker-push"
+          docker_image:       ${{ env.IMAGE_NAME }}
+          docker_tag:         ${{ env.IMAGE_TAG }}
+          error_message:      ${{ steps.capture-push-error.outputs.error_msg }}
+          slack_webhook_url:  ${{ secrets.SLACK_WEBHOOK_URL }}
+          gmail_username:     ${{ secrets.GMAIL_USERNAME }}
+          gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          notify_email_to:    ${{ secrets.NOTIFY_EMAIL_TO }}
 
 
-      # ✅ [4] PIPELINE COMPLETION ===================================
-      - name: Slack Success Notification
+      # ✅ [4] SUCCESS ───────────────────────────────────────────────────────────
+      - name: Notify — full pipeline success
         if: success()
         uses: ./.github/actions/slack-notify
         with:
-          status: "success"
-          pipeline: "Docker"
-          job_name: "all"
-          docker_image: ${{ env.IMAGE_NAME }}
-          docker_tag: ${{ env.IMAGE_TAG }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status:             "success"
+          pipeline:           "Docker"
+          job_name:           "all"
+          docker_image:       ${{ env.IMAGE_NAME }}
+          docker_tag:         ${{ env.IMAGE_TAG }}
+          slack_webhook_url:  ${{ secrets.SLACK_WEBHOOK_URL }}
+          gmail_username:     ${{ secrets.GMAIL_USERNAME }}
+          gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          notify_email_to:    ${{ secrets.NOTIFY_EMAIL_TO }}

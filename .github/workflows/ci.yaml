@@ -19,11 +19,11 @@ jobs:
     name: SonarQube
     runs-on: ubuntu-latest
     outputs:
-      quality_gate: ${{ steps.gate-check.outputs.quality-gate-status }}
-      bugs:         ${{ steps.sonar-metrics.outputs.bugs }}
+      quality_gate:    ${{ steps.gate-check.outputs.quality-gate-status }}
+      bugs:            ${{ steps.sonar-metrics.outputs.bugs }}
       vulnerabilities: ${{ steps.sonar-metrics.outputs.vulnerabilities }}
-      code_smells:  ${{ steps.sonar-metrics.outputs.code_smells }}
-      coverage:     ${{ steps.sonar-metrics.outputs.coverage }}
+      code_smells:     ${{ steps.sonar-metrics.outputs.code_smells }}
+      coverage:        ${{ steps.sonar-metrics.outputs.coverage }}
 
     steps:
       - name: Checkout code
@@ -35,12 +35,7 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v7.1.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          # ──────────────────────────────────────────────────────────────────
-          # NOTE: Using SonarQube Cloud (sonarcloud.io) by default.
-          # When you switch to your own SonarQube server, uncomment the line
-          # below and add SONAR_HOST_URL to your GitHub Secrets with your
-          # server URL (e.g. https://sonar.yourcompany.com)
-          # ──────────────────────────────────────────────────────────────────
+          # Uncomment and add SONAR_HOST_URL secret when using a self-hosted server:
           # SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
       - name: Quality Gate Check
@@ -49,55 +44,44 @@ jobs:
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          # ──────────────────────────────────────────────────────────────────
-          # NOTE: Uncomment below when switching to your own SonarQube server.
-          # ──────────────────────────────────────────────────────────────────
           # SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # Pull metrics from SonarQube API for detailed Slack message
       - name: Fetch SonarQube Metrics
         id: sonar-metrics
         if: always()
         run: |
           PROJECT_KEY=$(cat sonar-project.properties | grep "sonar.projectKey" | cut -d'=' -f2)
-
-          # ──────────────────────────────────────────────────────────────────
-          # NOTE: Currently pointing to SonarQube Cloud API (sonarcloud.io).
-          # When switching to your own server, replace the hardcoded URL:
-          #
-          #   FROM: "https://sonarcloud.io/api/measures/..."
-          #   TO:   "${{ secrets.SONAR_HOST_URL }}/api/measures/..."
-          #
-          # Also add SONAR_HOST_URL secret in:
-          #   GitHub → Settings → Secrets → Actions → New repository secret
-          # ──────────────────────────────────────────────────────────────────
+          # Replace sonarcloud.io with ${{ secrets.SONAR_HOST_URL }} for self-hosted.
           METRICS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
             "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY}&metricKeys=bugs,vulnerabilities,code_smells,coverage")
-
-          echo "bugs=$(echo $METRICS | jq -r '.component.measures[] | select(.metric=="bugs") | .value')" >> $GITHUB_OUTPUT
+          echo "bugs=$(echo $METRICS | jq -r '.component.measures[] | select(.metric=="bugs") | .value')"                     >> $GITHUB_OUTPUT
           echo "vulnerabilities=$(echo $METRICS | jq -r '.component.measures[] | select(.metric=="vulnerabilities") | .value')" >> $GITHUB_OUTPUT
-          echo "code_smells=$(echo $METRICS | jq -r '.component.measures[] | select(.metric=="code_smells") | .value')" >> $GITHUB_OUTPUT
-          echo "coverage=$(echo $METRICS | jq -r '.component.measures[] | select(.metric=="coverage") | .value')" >> $GITHUB_OUTPUT
+          echo "code_smells=$(echo $METRICS | jq -r '.component.measures[] | select(.metric=="code_smells") | .value')"        >> $GITHUB_OUTPUT
+          echo "coverage=$(echo $METRICS | jq -r '.component.measures[] | select(.metric=="coverage") | .value')"              >> $GITHUB_OUTPUT
 
       - name: Fail if Quality Gate failed
         if: steps.gate-check.outputs.quality-gate-status != 'PASSED'
         run: exit 1
 
-      - name: Slack Failure Notification
+      - name: Notify — SonarQube failure
         if: failure()
         uses: ./.github/actions/slack-notify
         with:
-          status: "failed"
-          pipeline: "CI"
-          job_name: "sonarqube"
-          sonar_bugs: ${{ steps.sonar-metrics.outputs.bugs }}
+          status:              "failed"
+          pipeline:            "CI"
+          job_name:            "sonarqube"
+          sonar_bugs:          ${{ steps.sonar-metrics.outputs.bugs }}
           sonar_vulnerabilities: ${{ steps.sonar-metrics.outputs.vulnerabilities }}
-          sonar_code_smells: ${{ steps.sonar-metrics.outputs.code_smells }}
-          sonar_coverage: ${{ steps.sonar-metrics.outputs.coverage }}
-          sonar_gate_status: ${{ steps.gate-check.outputs.quality-gate-status }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          sonar_code_smells:   ${{ steps.sonar-metrics.outputs.code_smells }}
+          sonar_coverage:      ${{ steps.sonar-metrics.outputs.coverage }}
+          sonar_gate_status:   ${{ steps.gate-check.outputs.quality-gate-status }}
+          slack_webhook_url:   ${{ secrets.SLACK_WEBHOOK_URL }}
+          # ── Gmail (remove these two lines if you don't want email alerts) ──
+          gmail_username:      ${{ secrets.GMAIL_USERNAME }}
+          gmail_app_password:  ${{ secrets.GMAIL_APP_PASSWORD }}
+          notify_email_to:     ${{ secrets.NOTIFY_EMAIL_TO }}
 
-
+  # ─────────────────────────────────────────────────────────────────────────────
   # JOB 2: Snyk SCA Scan (runs after SonarQube)
   # ─────────────────────────────────────────────────────────────────────────────
   snyk-sca:
@@ -107,9 +91,9 @@ jobs:
     permissions:
       security-events: write
     outputs:
-      critical: ${{ steps.snyk-counts.outputs.critical }}
-      high:     ${{ steps.snyk-counts.outputs.high }}
-      medium:   ${{ steps.snyk-counts.outputs.medium }}
+      critical:  ${{ steps.snyk-counts.outputs.critical }}
+      high:      ${{ steps.snyk-counts.outputs.high }}
+      medium:    ${{ steps.snyk-counts.outputs.medium }}
       error_msg: ${{ steps.snyk-counts.outputs.error_msg }}
 
     steps:
@@ -137,9 +121,9 @@ jobs:
           else
             CRITICAL="N/A"; HIGH="N/A"; MEDIUM="N/A"; ERROR_MSG="snyk.json not generated"
           fi
-          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
-          echo "high=$HIGH"         >> $GITHUB_OUTPUT
-          echo "medium=$MEDIUM"     >> $GITHUB_OUTPUT
+          echo "critical=$CRITICAL"   >> $GITHUB_OUTPUT
+          echo "high=$HIGH"           >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM"       >> $GITHUB_OUTPUT
           echo "error_msg=$ERROR_MSG" >> $GITHUB_OUTPUT
 
       - name: Upload Snyk SARIF to GitHub Security tab
@@ -151,19 +135,21 @@ jobs:
         if: steps.snyk.outcome == 'failure'
         run: exit 1
 
-      - name: Slack Failure Notification
+      - name: Notify — Snyk failure
         if: failure()
         uses: ./.github/actions/slack-notify
         with:
-          status: "failed"
-          pipeline: "CI"
-          job_name: "snyk-sca"
-          snyk_critical: ${{ steps.snyk-counts.outputs.critical }}
-          snyk_high: ${{ steps.snyk-counts.outputs.high }}
-          snyk_medium: ${{ steps.snyk-counts.outputs.medium }}
-          error_message: ${{ steps.snyk-counts.outputs.error_msg }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-
+          status:             "failed"
+          pipeline:           "CI"
+          job_name:           "snyk-sca"
+          snyk_critical:      ${{ steps.snyk-counts.outputs.critical }}
+          snyk_high:          ${{ steps.snyk-counts.outputs.high }}
+          snyk_medium:        ${{ steps.snyk-counts.outputs.medium }}
+          error_message:      ${{ steps.snyk-counts.outputs.error_msg }}
+          slack_webhook_url:  ${{ secrets.SLACK_WEBHOOK_URL }}
+          gmail_username:     ${{ secrets.GMAIL_USERNAME }}
+          gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          notify_email_to:    ${{ secrets.NOTIFY_EMAIL_TO }}
 
   # ─────────────────────────────────────────────────────────────────────────────
   # JOB 3: Unified Success Notification
@@ -192,3 +178,6 @@ jobs:
           snyk_high: ${{ needs.snyk-sca.outputs.high }}
           snyk_medium: ${{ needs.snyk-sca.outputs.medium }}
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          gmail_username:    ${{ secrets.GMAIL_USERNAME }}
+          gmail_app_password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          notify_email_to:   ${{ secrets.NOTIFY_EMAIL_TO }}
