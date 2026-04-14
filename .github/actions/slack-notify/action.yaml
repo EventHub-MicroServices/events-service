@@ -3,6 +3,7 @@ description: "Universal pipeline notification action for Slack and Gmail"
 
 inputs:
   # ── Core ────────────────────────────────────────────────────────────────────
+  #test
   status:
     required: true
     description: "'success' | 'failed'"
